@@ -1,5 +1,5 @@
 // ── Conecta ao backend via WebSocket ──────────────────────────────────────────
-const socket = io("http://localhost:3001");
+const socket = io("https://ecoflow-manager.onrender.com");
 const statusTxt = document.getElementById("status-txt");
 
 socket.on("connect", () => {
