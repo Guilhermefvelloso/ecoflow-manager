@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EcoFlow Manager</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Bibliotecas externas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+
+  <!-- ── Header ── -->
+  <header class="header">
+    <div class="logo">
+      <div class="logo-icon">☀️</div>
+      <div>
+        <div class="logo-name">EcoFlow Manager</div>
+        <div class="logo-sub">Plataforma inteligente de monitoramento solar</div>
+      </div>
+    </div>
+    <div class="status-pill">
+      <div class="pulse"></div>
+      <span id="status-txt">Conectando...</span>
+    </div>
+  </header>
+
+  <!-- ── Métricas ── -->
+  <div class="metrics">
+    <div class="metric">
+      <div class="metric-label">⚡ Potência atual</div>
+      <div class="metric-value">
+        <span id="m-pot">--</span><span class="metric-unit"> W</span>
+      </div>
+      <div class="metric-delta up" id="d-pot">Aguardando dados...</div>
+    </div>
+
+    <div class="metric">
+      <div class="metric-label">🌞 Geração hoje</div>
+      <div class="metric-value">
+        <span id="m-gen">--</span><span class="metric-unit"> kWh</span>
+      </div>
+      <div class="metric-delta" id="d-gen">Meta: 14 kWh</div>
+    </div>
+
+    <div class="metric">
+      <div class="metric-label">📅 Geração mensal</div>
+      <div class="metric-value">
+        <span id="m-mes">--</span><span class="metric-unit"> kWh</span>
+      </div>
+      <div class="metric-delta up">↑ +12% vs mês ant.</div>
+    </div>
+
+    <div class="metric">
+      <div class="metric-label">💰 Economia</div>
+      <div class="metric-value">R$<span id="m-eco">--</span></div>
+      <div class="metric-delta">Este mês</div>
+    </div>
+
+    <div class="metric">
+      <div class="metric-label">🌿 CO₂ evitado</div>
+      <div class="metric-value">
+        <span id="m-co2">--</span><span class="metric-unit"> kg</span>
+      </div>
+      <div class="metric-delta">Este mês</div>
+    </div>
+  </div>
+
+  <!-- ── Gráfico de geração + Gauge de eficiência ── -->
+  <div class="main-grid">
+
+    <div class="card">
+      <div class="card-title">
+        Geração de energia
+        <div class="tabs">
+          <button class="tab active" onclick="setView('hoje', this)">Hoje</button>
+          <button class="tab" onclick="setView('semana', this)">Semana</button>
+          <button class="tab" onclick="setView('mes', this)">Mês</button>
+        </div>
+      </div>
+      <div class="legend">
+        <span><span class="ld" style="background:var(--verde)"></span>Geração real</span>
+        <span><span class="ld" style="background:var(--amber);opacity:.6"></span>Estimado</span>
+      </div>
+      <div style="position:relative; height:220px">
+        <canvas id="genChart"
+          role="img"
+          aria-label="Gráfico de geração solar ao longo do tempo comparando real vs estimado">
+          Dados de geração de energia fotovoltaica.
+        </canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Eficiência do sistema</div>
+      <div class="gauge-wrap">
+        <canvas id="gaugeChart" width="200" height="180"
+          role="img"
+          aria-label="Indicador de eficiência do sistema solar">
+          Eficiência: carregando.
+        </canvas>
+        <div class="gauge-center">
+          <div class="gauge-pct" id="eff-pct">--</div>
+          <div class="gauge-lbl">eficiência</div>
+        </div>
+      </div>
+      <div class="vi-row">
+        <div class="vi-cell">
+          <div class="vi-lbl">Tensão</div>
+          <div class="vi-val" id="v-val" style="color:var(--verde)">-- V</div>
+        </div>
+        <div class="vi-cell">
+          <div class="vi-lbl">Corrente</div>
+          <div class="vi-val" id="i-val" style="color:var(--amber)">-- A</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Status dos painéis + Alertas ── -->
+  <div class="bottom-grid">
+
+    <div class="card">
+      <div class="card-title">Status dos painéis</div>
+      <div class="panel-grid" id="panel-grid"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Alertas</div>
+      <div class="alert-list">
+        <div class="alert-item">
+          <div class="alert-dot warn"></div>
+          <div>
+            <div class="alert-msg">Painel 3 com geração 15% abaixo do esperado</div>
+            <div class="alert-time">Hoje, 10:32</div>
+          </div>
+        </div>
+        <div class="alert-item">
+          <div class="alert-dot ok"></div>
+          <div>
+            <div class="alert-msg">Comunicação com inversor normalizada</div>
+            <div class="alert-time">Hoje, 08:15</div>
+          </div>
+        </div>
+        <div class="alert-item">
+          <div class="alert-dot info"></div>
+          <div>
+            <div class="alert-msg">Previsão de nebulosidade amanhã — geração estimada 60%</div>
+            <div class="alert-time">Hoje, 07:00</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- JavaScript próprio — carregado por último -->
+  <script src="app.js"></script>
+
+</body>
+</html>
