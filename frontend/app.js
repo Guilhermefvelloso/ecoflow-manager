@@ -1,5 +1,5 @@
 // ── Config ────────────────────────────────────────────────────────────────────
-const socket = io("https://ecoflow-manager.onrender.com");
+const BACKEND = ("https://ecoflow-manager.onrender.com");
 
 // ── Tema claro/escuro ─────────────────────────────────────────────────────────
 const temaBtn = document.getElementById("theme-toggle");
