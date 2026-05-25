@@ -12,7 +12,7 @@ ecoflow-manager/
 │   ├── server.js        ← Servidor Node.js (API + WebSocket)
 │   └── package.json
 ├── frontend/
-│   └── index.html       ← Dashboard web (abre direto no navegador)
+│   └── index.html      ← Dashboard web (abre direto no navegador)
 └── firmware/
     └── ecoflow_esp32.ino ← Código para o ESP32 (Arduino IDE)
 ```

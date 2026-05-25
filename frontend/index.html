@@ -4,105 +4,105 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>EcoFlow Manager</title>
-
-  <!-- CSS -->
   <link rel="stylesheet" href="style.css" />
-
-  <!-- Bibliotecas externas -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 </head>
 <body>
 
-  <!-- ── Header ── -->
   <header class="header">
     <div class="logo">
       <div class="logo-icon">☀️</div>
       <div>
         <div class="logo-name">EcoFlow Manager</div>
-        <div class="logo-sub">Plataforma inteligente de monitoramento solar</div>
+        <div class="logo-sub">Monitoramento solar em tempo real</div>
       </div>
     </div>
-    <div class="status-pill">
-      <div class="pulse"></div>
-      <span id="status-txt">Conectando...</span>
+    <div class="header-right">
+      <div class="clima-widget">
+        <span class="clima-icon" id="clima-icon">🌤️</span>
+        <div class="clima-info">
+          <span class="clima-temp" id="clima-temp">--°C</span>
+          <span class="clima-desc" id="clima-desc">Carregando...</span>
+        </div>
+        <div class="clima-details">
+          <span id="clima-umidade">💧 --%</span>
+          <span id="clima-vento">🌬️ -- km/h</span>
+          <span id="clima-nuvens">☁️ --%</span>
+        </div>
+        <span class="fator-badge fator-alto" id="fator-badge">⚡ --%</span>
+      </div>
+      <button class="theme-toggle" id="theme-toggle" title="Alternar tema">☀️</button>
+      <div class="status-pill">
+        <div class="pulse"></div>
+        <span id="status-txt">Conectando...</span>
+      </div>
     </div>
   </header>
 
-  <!-- ── Métricas ── -->
   <div class="metrics">
     <div class="metric">
       <div class="metric-label">⚡ Potência atual</div>
-      <div class="metric-value">
-        <span id="m-pot">--</span><span class="metric-unit"> W</span>
-      </div>
-      <div class="metric-delta up" id="d-pot">Aguardando dados...</div>
+      <div class="metric-value"><span id="m-pot" data-valor="0">--</span><span class="metric-unit"> W</span></div>
+      <div class="metric-delta up" id="d-pot">Aguardando...</div>
+      <div class="metric-bar"><div class="metric-bar-fill" id="bar-pot" style="width:0%"></div></div>
     </div>
-
     <div class="metric">
       <div class="metric-label">🌞 Geração hoje</div>
-      <div class="metric-value">
-        <span id="m-gen">--</span><span class="metric-unit"> kWh</span>
-      </div>
+      <div class="metric-value"><span id="m-gen" data-valor="0">--</span><span class="metric-unit"> kWh</span></div>
       <div class="metric-delta" id="d-gen">Meta: 14 kWh</div>
+      <div class="metric-bar"><div class="metric-bar-fill" id="bar-gen" style="width:0%"></div></div>
     </div>
-
     <div class="metric">
       <div class="metric-label">📅 Geração mensal</div>
-      <div class="metric-value">
-        <span id="m-mes">--</span><span class="metric-unit"> kWh</span>
-      </div>
+      <div class="metric-value"><span id="m-mes" data-valor="0">--</span><span class="metric-unit"> kWh</span></div>
       <div class="metric-delta up">↑ +12% vs mês ant.</div>
     </div>
-
     <div class="metric">
       <div class="metric-label">💰 Economia</div>
-      <div class="metric-value">R$<span id="m-eco">--</span></div>
+      <div class="metric-value">R$<span id="m-eco" data-valor="0">--</span></div>
       <div class="metric-delta">Este mês</div>
     </div>
-
+    <div class="metric">
+      <div class="metric-label">🌡️ Temp. painel</div>
+      <div class="metric-value"><span id="m-temp" data-valor="0">--</span><span class="metric-unit"> °C</span></div>
+      <div class="metric-delta" id="d-temp">--</div>
+    </div>
     <div class="metric">
       <div class="metric-label">🌿 CO₂ evitado</div>
-      <div class="metric-value">
-        <span id="m-co2">--</span><span class="metric-unit"> kg</span>
-      </div>
+      <div class="metric-value"><span id="m-co2" data-valor="0">--</span><span class="metric-unit"> kg</span></div>
       <div class="metric-delta">Este mês</div>
     </div>
   </div>
 
-  <!-- ── Gráfico de geração + Gauge de eficiência ── -->
   <div class="main-grid">
-
     <div class="card">
       <div class="card-title">
         Geração de energia
         <div class="tabs">
-          <button class="tab active" onclick="setView('hoje', this)">Hoje</button>
-          <button class="tab" onclick="setView('semana', this)">Semana</button>
-          <button class="tab" onclick="setView('mes', this)">Mês</button>
+          <button class="tab active" onclick="setView('hoje',this)">Hoje</button>
+          <button class="tab" onclick="setView('semana',this)">Semana</button>
+          <button class="tab" onclick="setView('mes',this)">Mês</button>
         </div>
       </div>
       <div class="legend">
         <span><span class="ld" style="background:var(--verde)"></span>Geração real</span>
-        <span><span class="ld" style="background:var(--amber);opacity:.6"></span>Estimado</span>
+        <span><span class="ld" style="background:var(--amber);opacity:.7"></span>Estimado</span>
       </div>
-      <div style="position:relative; height:220px">
-        <canvas id="genChart"
-          role="img"
-          aria-label="Gráfico de geração solar ao longo do tempo comparando real vs estimado">
-          Dados de geração de energia fotovoltaica.
-        </canvas>
+      <div style="position:relative;height:210px">
+        <canvas id="genChart"></canvas>
+      </div>
+      <div class="clima-bar-row">
+        <span id="clima-bar-pct">Fator solar: --%</span>
+        <div class="clima-bar-track">
+          <div class="clima-bar-fill" id="clima-bar-fill" style="width:0%"></div>
+        </div>
       </div>
     </div>
-
     <div class="card">
       <div class="card-title">Eficiência do sistema</div>
       <div class="gauge-wrap">
-        <canvas id="gaugeChart" width="200" height="180"
-          role="img"
-          aria-label="Indicador de eficiência do sistema solar">
-          Eficiência: carregando.
-        </canvas>
+        <canvas id="gaugeChart" width="200" height="175"></canvas>
         <div class="gauge-center">
           <div class="gauge-pct" id="eff-pct">--</div>
           <div class="gauge-lbl">eficiência</div>
@@ -118,49 +118,84 @@
           <div class="vi-val" id="i-val" style="color:var(--amber)">-- A</div>
         </div>
       </div>
+      <div class="metric-bar" style="margin-top:12px">
+        <div class="metric-bar-fill" id="bar-eff" style="width:0%"></div>
+      </div>
     </div>
-
   </div>
 
-  <!-- ── Status dos painéis + Alertas ── -->
   <div class="bottom-grid">
-
     <div class="card">
       <div class="card-title">Status dos painéis</div>
       <div class="panel-grid" id="panel-grid"></div>
     </div>
-
     <div class="card">
-      <div class="card-title">Alertas</div>
-      <div class="alert-list">
-        <div class="alert-item">
-          <div class="alert-dot warn"></div>
-          <div>
-            <div class="alert-msg">Painel 3 com geração 15% abaixo do esperado</div>
-            <div class="alert-time">Hoje, 10:32</div>
-          </div>
-        </div>
-        <div class="alert-item">
-          <div class="alert-dot ok"></div>
-          <div>
-            <div class="alert-msg">Comunicação com inversor normalizada</div>
-            <div class="alert-time">Hoje, 08:15</div>
-          </div>
-        </div>
+      <div class="card-title">Alertas automáticos</div>
+      <div class="alert-list" id="alert-list">
         <div class="alert-item">
           <div class="alert-dot info"></div>
-          <div>
-            <div class="alert-msg">Previsão de nebulosidade amanhã — geração estimada 60%</div>
-            <div class="alert-time">Hoje, 07:00</div>
-          </div>
+          <div><div class="alert-msg">Carregando alertas...</div><div class="alert-time">--</div></div>
         </div>
       </div>
     </div>
-
   </div>
 
-  <!-- JavaScript próprio — carregado por último -->
-  <script src="app.js"></script>
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title">Previsão — próximos 3 dias</div>
+    <div class="forecast-grid" id="forecast-grid">
+      <div style="color:var(--text2);font-size:12px">Carregando previsão...</div>
+    </div>
+  </div>
 
+  <div class="bottom-grid2">
+    <div class="card">
+      <div class="card-title">Retorno do investimento</div>
+      <div class="roi-grid">
+        <div class="roi-item">
+          <div class="roi-label">Economia / mês</div>
+          <div class="roi-value" id="roi-economia-mes">R$ --</div>
+          <div class="roi-sub">com tarifa atual</div>
+        </div>
+        <div class="roi-item">
+          <div class="roi-label">Economia / ano</div>
+          <div class="roi-value" id="roi-economia-ano">R$ --</div>
+          <div class="roi-sub">projeção anual</div>
+        </div>
+        <div class="roi-item">
+          <div class="roi-label">Tempo de retorno</div>
+          <div class="roi-value" id="roi-retorno">--</div>
+          <div class="roi-sub">payback estimado</div>
+        </div>
+        <div class="roi-item">
+          <div class="roi-label">Investimento</div>
+          <div class="roi-value" id="roi-investimento">R$ --</div>
+          <div class="roi-sub">custo instalação</div>
+        </div>
+      </div>
+      <div class="roi-progress">
+        <div class="roi-progress-label">
+          <span>Progresso de recuperação</span>
+          <span id="roi-pct-label">0%</span>
+        </div>
+        <div class="roi-bar"><div class="roi-bar-fill" id="roi-bar-fill" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Histórico de alertas</div>
+      <div class="hist-list" id="hist-list">
+        <div style="color:var(--text2);font-size:12px">Carregando histórico...</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Mapa de calor — geração (kW/h)</div>
+      <div id="heatmap-wrap">
+        <div style="color:var(--text2);font-size:12px">Carregando heatmap...</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
 </body>
 </html>
