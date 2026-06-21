@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EcoFlow Manager — Painéis</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+</head>
+<body>
+
+  <nav class="navbar">
+    <a href="index.html"      class="nav-link"><span class="nav-icon">📊</span> Dashboard</a>
+    <a href="previsao.html"   class="nav-link"><span class="nav-icon">🌤️</span> Clima e Previsão</a>
+    <a href="relatorios.html" class="nav-link"><span class="nav-icon">📈</span> Relatórios</a>
+    <a href="paineis.html"    class="nav-link active"><span class="nav-icon">☀️</span> Painéis</a>
+  </nav>
+
+  <header class="header">
+    <div class="logo">
+      <div class="logo-icon">☀️</div>
+      <div>
+        <div class="logo-name">EcoFlow Manager</div>
+        <div class="logo-sub">Gestão e monitoramento dos painéis solares</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <button class="theme-toggle" id="theme-toggle">☀️</button>
+      <div class="status-pill">
+        <div class="pulse"></div>
+        <span id="status-txt">Carregando...</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="four-grid">
+    <div class="metric">
+      <div class="metric-label">✅ Painéis OK</div>
+      <div class="metric-value"><span id="p-ok" style="color:var(--verde)">--</span><span class="metric-unit"> / 6</span></div>
+      <div class="metric-delta up">Funcionando normalmente</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">⚠️ Em alerta</div>
+      <div class="metric-value"><span id="p-alerta" style="color:var(--amber)">--</span><span class="metric-unit"> / 6</span></div>
+      <div class="metric-delta warn">Verificação necessária</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">⚡ Potência total</div>
+      <div class="metric-value"><span id="p-potencia">--</span><span class="metric-unit"> W</span></div>
+      <div class="metric-delta">Sistema completo</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">📊 Eficiência média</div>
+      <div class="metric-value"><span id="p-eficiencia">--</span><span class="metric-unit"> %</span></div>
+      <div class="metric-bar"><div class="metric-bar-fill" id="bar-eficiencia" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <div class="two-grid">
+    <div class="card">
+      <div class="card-title">Comparativo de potência por painel (W)</div>
+      <div style="position:relative;height:220px">
+        <canvas id="painelBarChart"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Distribuição de eficiência</div>
+      <div style="position:relative;height:220px;display:flex;align-items:center;justify-content:center">
+        <canvas id="painelPieChart" width="220" height="220"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title">Status detalhado — todos os painéis</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px" id="paineis-detalhe"></div>
+  </div>
+
+  <div class="two-grid">
+    <div class="card">
+      <div class="card-title">Histórico completo de alertas</div>
+      <div class="hist-list" id="hist-alertas" style="max-height:320px"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Registro de manutenções</div>
+      <div class="manut-list" id="manut-list"></div>
+      <div style="margin-top:16px">
+        <div class="input-group">
+          <label class="input-label">Adicionar registro de manutenção</label>
+          <input class="input-field" id="manut-desc" type="text" placeholder="Ex: Limpeza dos painéis P1 e P2" style="margin-bottom:8px"/>
+          <select class="input-field" id="manut-painel" style="margin-bottom:8px">
+            <option value="Todos">Todos os painéis</option>
+            <option value="P1">P1</option>
+            <option value="P2">P2</option>
+            <option value="P3">P3</option>
+            <option value="P4">P4</option>
+            <option value="P5">P5</option>
+            <option value="P6">P6</option>
+          </select>
+          <button class="btn-primary" onclick="adicionarManutencao()">Registrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:0">
+    <div class="card-title">Histórico de performance semanal por painel</div>
+    <div style="position:relative;height:220px">
+      <canvas id="performanceChart"></canvas>
+    </div>
+  </div>
+
+  <script>
+   const BACKEND = "https://ecoflow-manager.onrender.com";
+
+    // Tema
+    const temaBtn = document.getElementById("theme-toggle");
+    let temaAtual = localStorage.getItem("tema") || "dark";
+    document.documentElement.setAttribute("data-theme", temaAtual);
+    temaBtn.textContent = temaAtual === "dark" ? "☀️" : "🌙";
+    temaBtn.addEventListener("click", () => {
+      temaAtual = temaAtual === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", temaAtual);
+      localStorage.setItem("tema", temaAtual);
+      temaBtn.textContent = temaAtual === "dark" ? "☀️" : "🌙";
+    });
+
+    // Manutenções
+    let manutencoes = JSON.parse(localStorage.getItem("manutencoes") || "[]");
+    if (!manutencoes.length) {
+      manutencoes = [
+        { data:"15/04/2026", desc:"Limpeza geral dos painéis", painel:"Todos" },
+        { data:"10/03/2026", desc:"Verificação de conexões elétricas", painel:"P3" },
+        { data:"20/02/2026", desc:"Inspeção visual após chuva forte", painel:"Todos" },
+      ];
+    }
+
+    function adicionarManutencao() {
+      const desc   = document.getElementById("manut-desc").value.trim();
+      const painel = document.getElementById("manut-painel").value;
+      if (!desc) return;
+      const data = new Date().toLocaleDateString("pt-BR");
+      manutencoes.unshift({ data, desc, painel });
+      localStorage.setItem("manutencoes", JSON.stringify(manutencoes));
+      document.getElementById("manut-desc").value = "";
+      renderManutencoes();
+    }
+
+    function renderManutencoes() {
+      document.getElementById("manut-list").innerHTML = manutencoes.slice(0,6).map(m => `
+        <div class="manut-item">
+          <div class="manut-data">${m.data}</div>
+          <div class="manut-desc">${m.desc}</div>
+          <div class="manut-painel">${m.painel}</div>
+        </div>`).join("");
+    }
+
+    // Controle dos gráficos — evita recriar toda vez
+    let barChart, pieChart, perfChart;
+    let primeiraVez = true;
+
+    async function carregarDados() {
+      try {
+        const r = await fetch(`${BACKEND}/api/dados`);
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        const d = await r.json();
+
+        const ok       = d.paineis.filter(p => p.status === "ok").length;
+        const alerta   = d.paineis.filter(p => p.status === "alerta").length;
+        const potTotal = d.paineis.reduce((a, p) => a + p.potencia, 0);
+        const efMedia  = Math.round(d.paineis.reduce((a, p) => a + p.eficiencia, 0) / d.paineis.length);
+
+        document.getElementById("p-ok").textContent         = ok;
+        document.getElementById("p-alerta").textContent     = alerta;
+        document.getElementById("p-potencia").textContent   = potTotal.toLocaleString("pt-BR");
+        document.getElementById("p-eficiencia").textContent = efMedia;
+        document.getElementById("bar-eficiencia").style.width = efMedia + "%";
+        document.getElementById("status-txt").textContent   = alerta > 0 ? `${alerta} em alerta` : "Todos OK";
+        document.getElementById("status-txt").style.color   = alerta > 0 ? "var(--amber)" : "var(--verde)";
+
+        // Só renderiza os gráficos pesados na primeira vez
+        if (primeiraVez) {
+          renderDetalhes(d.paineis);
+          renderBarChart(d.paineis);
+          renderPieChart(d.paineis);
+          renderPerformanceChart(d.paineis);
+          renderHistAlertas(d.historico_alertas);
+          renderManutencoes();
+          primeiraVez = false;
+        } else {
+          // Nas atualizações seguintes só atualiza os dados dos gráficos
+          if (barChart) {
+            barChart.data.datasets[0].data = d.paineis.map(p => p.potencia);
+            barChart.update("none");
+          }
+          renderHistAlertas(d.historico_alertas);
+        }
+
+      } catch(e) {
+        console.error("Erro ao carregar dados:", e.message);
+        document.getElementById("status-txt").textContent = "Backend offline";
+        document.getElementById("status-txt").style.color = "var(--red)";
+        setTimeout(carregarDados, 5000);
+      }
+    }
+
+    function renderDetalhes(paineis) {
+      const historicos = {};
+      paineis.forEach(p => {
+        historicos[p.id] = Array.from({length:7}, () =>
+          Math.max(60, Math.min(100, p.eficiencia + Math.round((Math.random()-0.5)*12)))
+        );
+      });
+
+      document.getElementById("paineis-detalhe").innerHTML = paineis.map(p => {
+        const hist  = historicos[p.id] || [];
+        const trend = parseFloat((Math.random() * 10 - 5).toFixed(1));
+        const cor   = p.status === "ok" ? "var(--verde)" : p.status === "alerta" ? "var(--amber)" : "var(--red)";
+        const badge = p.status === "ok" ? "badge-ok" : p.status === "alerta" ? "badge-alerta" : "badge-erro";
+        return `
+          <div class="painel-detalhe">
+            <div class="painel-header">
+              <div class="painel-nome" style="color:${cor}">${p.id}</div>
+              <span class="painel-badge ${badge}">${p.status === "ok" ? "Normal" : p.status === "alerta" ? "Alerta" : "Erro"}</span>
+            </div>
+            <div class="painel-stats">
+              <div class="painel-stat">
+                <div class="ps-label">Eficiência</div>
+                <div class="ps-value" style="color:${cor}">${p.eficiencia}%</div>
+              </div>
+              <div class="painel-stat">
+                <div class="ps-label">Potência</div>
+                <div class="ps-value">${p.potencia}W</div>
+              </div>
+              <div class="painel-stat">
+                <div class="ps-label">Tendência</div>
+                <div class="ps-value" style="color:${trend>=0?'var(--verde)':'var(--red)'}">${trend>=0?'↑':'↓'}${Math.abs(trend)}%</div>
+              </div>
+            </div>
+            <div class="painel-bar">
+              <div class="painel-bar-fill" style="width:${p.eficiencia}%;background:${cor}"></div>
+            </div>
+            <div class="painel-historico">
+              Últimos 7 dias: ${hist.map(v=>`<span style="color:${v>=85?'var(--verde)':v>=70?'var(--amber)':'var(--red)'}">${v}%</span>`).join(" › ")}
+            </div>
+          </div>`;
+      }).join("");
+    }
+
+    function renderBarChart(paineis) {
+      if (barChart) barChart.destroy();
+      barChart = new Chart(document.getElementById("painelBarChart"), {
+        type:"bar",
+        data:{
+          labels: paineis.map(p=>p.id),
+          datasets:[{
+            data: paineis.map(p=>p.potencia),
+            backgroundColor: paineis.map(p => p.status==="ok" ? "rgba(0,208,132,0.6)" : p.status==="alerta" ? "rgba(255,184,48,0.6)" : "rgba(255,87,87,0.6)"),
+            borderColor: paineis.map(p => p.status==="ok" ? "#00D084" : p.status==="alerta" ? "#FFB830" : "#FF5757"),
+            borderWidth:1, borderRadius:6
+          }]
+        },
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          plugins:{legend:{display:false}},
+          scales:{
+            x:{ticks:{color:"#7A8FA0",font:{size:11}},grid:{color:"rgba(255,255,255,0.04)"}},
+            y:{ticks:{color:"#7A8FA0",font:{size:11}},grid:{color:"rgba(255,255,255,0.04)"}}
+          }
+        }
+      });
+    }
+
+    function renderPieChart(paineis) {
+      if (pieChart) pieChart.destroy();
+      pieChart = new Chart(document.getElementById("painelPieChart"), {
+        type:"doughnut",
+        data:{
+          labels: paineis.map(p=>p.id),
+          datasets:[{
+            data: paineis.map(p=>p.eficiencia),
+            backgroundColor:["rgba(0,208,132,0.7)","rgba(0,208,132,0.5)","rgba(255,184,48,0.7)","rgba(0,208,132,0.9)","rgba(0,208,132,0.6)","rgba(0,208,132,0.8)"],
+            borderWidth:0
+          }]
+        },
+        options:{
+          responsive:false, cutout:"60%",
+          plugins:{ legend:{ position:"right", labels:{ color:"#7A8FA0", font:{size:10}, boxWidth:10 } } }
+        }
+      });
+    }
+
+    function renderPerformanceChart(paineis) {
+      if (perfChart) perfChart.destroy();
+      const labels = ["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"];
+      const cores  = ["#00D084","#4FC3F7","#FFB830","#A78BFA","#FF5757","#00A866"];
+      const datasets = paineis.map((p,i) => ({
+        label: p.id,
+        data: Array.from({length:7},()=>Math.max(60,p.eficiencia + Math.round((Math.random()-0.5)*8))),
+        borderColor: cores[i], backgroundColor:"transparent",
+        tension:0.4, pointRadius:3, borderWidth:2
+      }));
+      perfChart = new Chart(document.getElementById("performanceChart"), {
+        type:"line",
+        data:{ labels, datasets },
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          plugins:{ legend:{ labels:{ color:"#7A8FA0", font:{size:10}, boxWidth:10 } } },
+          scales:{
+            x:{ticks:{color:"#7A8FA0",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}},
+            y:{ticks:{color:"#7A8FA0",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"},min:60,max:100}
+          }
+        }
+      });
+    }
+
+    function renderHistAlertas(hist) {
+      if (!hist || !hist.length) return;
+      document.getElementById("hist-alertas").innerHTML = hist.map(a => `
+        <div class="hist-item">
+          <div class="alert-dot ${a.tipo}"></div>
+          <div>
+            <div class="hist-msg">${a.msg}</div>
+            <div class="hist-time">${a.hora}</div>
+          </div>
+        </div>`).join("");
+    }
+
+    carregarDados();
+    setInterval(carregarDados, 5000);
+  </script>
+</body>
+</html>

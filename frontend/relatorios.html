@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EcoFlow Manager — Relatórios</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+  <nav class="navbar">
+    <a href="index.html"      class="nav-link"><span class="nav-icon">📊</span> Dashboard</a>
+    <a href="previsao.html"   class="nav-link"><span class="nav-icon">🌤️</span> Clima e Previsão</a>
+    <a href="relatorios.html" class="nav-link active"><span class="nav-icon">📈</span> Relatórios</a>
+    <a href="paineis.html"    class="nav-link"><span class="nav-icon">☀️</span> Painéis</a>
+  </nav>
+
+  <header class="header">
+    <div class="logo">
+      <div class="logo-icon">☀️</div>
+      <div>
+        <div class="logo-name">EcoFlow Manager</div>
+        <div class="logo-sub">Relatórios e Retorno do Investimento</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <button class="theme-toggle" id="theme-toggle">☀️</button>
+    </div>
+  </header>
+
+  <!-- KPIs principais -->
+   <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
+  <button onclick="exportarPDF()" style="font-size:12px;padding:8px 16px;border-radius:8px;border:1px solid var(--verde);background:rgba(0,208,132,.12);color:var(--verde);cursor:pointer;font-family:var(--sans);display:flex;align-items:center;gap:6px">
+    📄 Exportar Relatório PDF
+  </button>
+</div>
+  <div class="four-grid">
+    <div class="metric">
+      <div class="metric-label">💰 Economia total</div>
+      <div class="metric-value">R$<span id="r-eco-total">--</span></div>
+      <div class="metric-delta up">Desde a instalação</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">⚡ Energia gerada</div>
+      <div class="metric-value"><span id="r-kwh-total">--</span><span class="metric-unit"> kWh</span></div>
+      <div class="metric-delta up">Total acumulado</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">🌿 CO₂ evitado</div>
+      <div class="metric-value"><span id="r-co2">--</span><span class="metric-unit"> kg</span></div>
+      <div class="metric-delta up">Impacto ambiental</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">📅 Tempo operando</div>
+      <div class="metric-value"><span id="r-meses">--</span><span class="metric-unit"> meses</span></div>
+      <div class="metric-delta">Desde instalação</div>
+    </div>
+  </div>
+
+  <!-- Gráfico economia acumulada + geração mensal -->
+  <div class="two-grid">
+    <div class="card">
+      <div class="card-title">Economia acumulada por mês (R$)</div>
+      <div style="position:relative;height:220px">
+        <canvas id="economiaChart"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Geração mensal (kWh)</div>
+      <div style="position:relative;height:220px">
+        <canvas id="geracaoMensalChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROI Calculadora + Resumo -->
+  <div class="two-grid">
+    <div class="card">
+      <div class="card-title">Calculadora de ROI</div>
+      <div class="input-group">
+        <label class="input-label">Investimento na instalação (R$)</label>
+        <input class="input-field" id="inp-investimento" type="number" value="15000" />
+      </div>
+      <div class="input-group">
+        <label class="input-label">Tarifa de energia (R$/kWh)</label>
+        <input class="input-field" id="inp-tarifa" type="number" value="0.95" step="0.01" />
+      </div>
+      <div class="input-group">
+        <label class="input-label">Geração mensal estimada (kWh)</label>
+        <input class="input-field" id="inp-geracao" type="number" value="312" />
+      </div>
+      <button class="btn-primary" onclick="calcularROI()">Calcular</button>
+
+      <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:8px" id="roi-resultado"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Projeção de retorno</div>
+      <div style="position:relative;height:280px">
+        <canvas id="roiChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Comparativo mensal -->
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title">Comparativo — geração real vs estimada por mês</div><div class="card-title">
+  Comparativo — geração real vs estimada por mês
+  <button onclick="exportarCSV()" style="font-size:10px;padding:4px 12px;border-radius:6px;border:1px solid var(--verde);background:rgba(0,208,132,.12);color:var(--verde);cursor:pointer;font-family:var(--sans)">⬇️ Exportar CSV</button>
+</div>
+    <div style="position:relative;height:220px">
+      <canvas id="comparativoChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Resumo ambiental -->
+  <div class="three-grid">
+    <div class="card" style="text-align:center">
+      <div class="card-title" style="justify-content:center">🌿 CO₂ evitado equivale a</div>
+      <div class="stat-big">
+        <div class="stat-big-value" id="env-arvores" style="color:var(--verde)">--</div>
+        <div class="stat-big-label">árvores plantadas</div>
+      </div>
+    </div>
+    <div class="card" style="text-align:center">
+      <div class="card-title" style="justify-content:center">🚗 Emissões evitadas</div>
+      <div class="stat-big">
+        <div class="stat-big-value" id="env-km" style="color:var(--blue)">--</div>
+        <div class="stat-big-label">km de carro não rodados</div>
+      </div>
+    </div>
+    <div class="card" style="text-align:center">
+      <div class="card-title" style="justify-content:center">💡 Energia limpa</div>
+      <div class="stat-big">
+        <div class="stat-big-value" id="env-casas" style="color:var(--amber)">--</div>
+        <div class="stat-big-label">meses de uma casa alimentada</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+   const BACKEND = "https://ecoflow-manager.onrender.com";
+
+    // Tema
+    const temaBtn = document.getElementById("theme-toggle");
+    let temaAtual = localStorage.getItem("tema") || "dark";
+    document.documentElement.setAttribute("data-theme", temaAtual);
+    temaBtn.textContent = temaAtual === "dark" ? "☀️" : "🌙";
+    temaBtn.addEventListener("click", () => {
+      temaAtual = temaAtual === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", temaAtual);
+      localStorage.setItem("tema", temaAtual);
+      temaBtn.textContent = temaAtual === "dark" ? "☀️" : "🌙";
+    });
+
+    const meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+    const geracaoSimulada = [280,295,310,325,340,320,305,290,310,330,315,312];
+    const estimadoMensal  = Array(12).fill(300);
+    const economiaMensal  = geracaoSimulada.map(v => parseFloat((v * 0.95).toFixed(2)));
+
+    async function carregarDados() {
+      try {
+        const r = await fetch(`${BACKEND}/api/dados`);
+        const d = await r.json();
+
+        const totalKwh   = geracaoSimulada.reduce((a,b)=>a+b,0);
+        const totalEco   = parseFloat((totalKwh * d.custo_kwh).toFixed(2));
+        const totalCO2   = Math.round(totalKwh * 0.475);
+        const mesesOp    = 12;
+
+        document.getElementById("r-kwh-total").textContent = totalKwh.toLocaleString("pt-BR");
+        document.getElementById("r-eco-total").textContent = totalEco.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+        document.getElementById("r-co2").textContent       = totalCO2.toLocaleString("pt-BR");
+        document.getElementById("r-meses").textContent     = mesesOp;
+
+        document.getElementById("env-arvores").textContent = Math.round(totalCO2 / 22);
+        document.getElementById("env-km").textContent      = Math.round(totalCO2 * 6).toLocaleString("pt-BR");
+        document.getElementById("env-casas").textContent   = Math.round(totalKwh / 300);
+
+        renderGraficos(d);
+        calcularROI();
+      } catch(e) { console.error(e); }
+    }
+
+    function renderGraficos(d) {
+      // Economia acumulada
+      let acum = 0;
+      const acumulada = economiaMensal.map(v => { acum += v; return parseFloat(acum.toFixed(2)); });
+      new Chart(document.getElementById("economiaChart"), {
+        type:"line",
+        data:{ labels:meses, datasets:[{ data:acumulada, borderColor:"#00D084", backgroundColor:"rgba(0,208,132,0.08)", fill:true, tension:0.4, pointRadius:3, borderWidth:2 }] },
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ticks:{color:"#7A8FA0",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}}, y:{ticks:{color:"#7A8FA0",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}} } }
+      });
+
+      // Geração mensal
+      new Chart(document.getElementById("geracaoMensalChart"), {
+        type:"bar",
+        data:{ labels:meses, datasets:[{ data:geracaoSimulada, backgroundColor:"rgba(79,195,247,0.6)", borderColor:"#4FC3F7", borderWidth:1, borderRadius:4 }] },
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ticks:{color:"#7A8FA0",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}}, y:{ticks:{color:"#7A8FA0",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}} } }
+      });
+
+      // Comparativo real vs estimado
+      new Chart(document.getElementById("comparativoChart"), {
+        type:"bar",
+        data:{
+          labels:meses,
+          datasets:[
+            { label:"Real (kWh)", data:geracaoSimulada, backgroundColor:"rgba(0,208,132,0.6)", borderRadius:4 },
+            { label:"Estimado (kWh)", data:estimadoMensal, backgroundColor:"rgba(255,184,48,0.4)", borderRadius:4 }
+          ]
+        },
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{color:"#7A8FA0",font:{size:10}}}}, scales:{ x:{ticks:{color:"#7A8FA0",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}}, y:{ticks:{color:"#7A8FA0",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}} } }
+      });
+
+      calcularROI();
+    }
+
+    let roiChart;
+    function calcularROI() {
+      const inv    = parseFloat(document.getElementById("inp-investimento").value) || 15000;
+      const tarifa = parseFloat(document.getElementById("inp-tarifa").value) || 0.95;
+      const gerMes = parseFloat(document.getElementById("inp-geracao").value) || 312;
+
+      const ecoMes  = gerMes * tarifa;
+      const ecoAno  = ecoMes * 12;
+      const payback = Math.round(inv / ecoMes);
+      const pct     = Math.min(100, Math.round((ecoAno / inv) * 100 * 3));
+
+      document.getElementById("roi-resultado").innerHTML = `
+        <div class="roi-item"><div class="roi-label">Economia/mês</div><div class="roi-value" style="color:var(--verde)">R$ ${ecoMes.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})}</div></div>
+        <div class="roi-item"><div class="roi-label">Economia/ano</div><div class="roi-value" style="color:var(--verde)">R$ ${ecoAno.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})}</div></div>
+        <div class="roi-item"><div class="roi-label">Payback</div><div class="roi-value" style="color:var(--amber)">${payback} meses</div></div>
+        <div class="roi-item"><div class="roi-label">Recuperado</div><div class="roi-value" style="color:var(--blue)">${pct}%</div></div>`;
+
+      // Gráfico ROI
+      const anos    = Array.from({length:16},(_,i)=>i);
+      const gastou  = anos.map(a => inv);
+      const ganhou  = anos.map(a => parseFloat((a * ecoAno).toFixed(2)));
+      if (roiChart) roiChart.destroy();
+      roiChart = new Chart(document.getElementById("roiChart"), {
+        type:"line",
+        data:{
+          labels: anos.map(a => `Ano ${a}`),
+          datasets:[
+            { label:"Investimento (R$)", data:gastou, borderColor:"rgba(255,87,87,0.7)", backgroundColor:"transparent", borderDash:[5,4], borderWidth:2, pointRadius:0 },
+            { label:"Retorno acumulado (R$)", data:ganhou, borderColor:"#00D084", backgroundColor:"rgba(0,208,132,0.08)", fill:true, tension:0.4, borderWidth:2, pointRadius:2 }
+          ]
+        },
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{color:"#7A8FA0",font:{size:10}}}}, scales:{ x:{ticks:{color:"#7A8FA0",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}}, y:{ticks:{color:"#7A8FA0",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}} } }
+      });
+    }
+
+    carregarDados();
+    
+    function exportarCSV() {
+  const linhas = [
+    ["Mês", "Geração Real (kWh)", "Geração Estimada (kWh)", "Economia (R$)"],
+    ...meses.map((m, i) => [
+      m,
+      geracaoSimulada[i],
+      estimadoMensal[i],
+      economiaMensal[i].toFixed(2)
+    ])
+  ];
+  const csv     = linhas.map(l => l.join(";")).join("\n");
+  const blob    = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url     = URL.createObjectURL(blob);
+  const link    = document.createElement("a");
+  link.href     = url;
+  link.download = "ecoflow_relatorio.csv";
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+async function exportarPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const verde  = [0,208,132];
+  const verde2 = [0,168,102];
+  const cinza  = [120,120,120];
+  const cinzaEscuro = [40,40,40];
+  const pageW = doc.internal.pageSize.getWidth();
+
+  // ── Cabeçalho com fundo verde ──
+  doc.setFillColor(...verde);
+  doc.rect(0, 0, pageW, 38, "F");
+  doc.setFontSize(22);
+  doc.setTextColor(255,255,255);
+  doc.setFont(undefined, "bold");
+  doc.text("EcoFlow Manager", 15, 18);
+  doc.setFontSize(10);
+  doc.setFont(undefined, "normal");
+  doc.text("Relatório de Monitoramento Solar — Paracambi, RJ", 15, 26);
+  doc.setFontSize(8);
+  doc.text(`Gerado em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR")}`, 15, 32);
+
+  let y = 50;
+
+  // ── Cards de resumo (estilo dashboard) ──
+  const totalKwh = document.getElementById("r-kwh-total").textContent;
+  const totalEco = document.getElementById("r-eco-total").textContent;
+  const totalCO2 = document.getElementById("r-co2").textContent;
+  const mesesOp  = document.getElementById("r-meses").textContent;
+
+  const cards = [
+    { label: "ENERGIA GERADA", valor: `${totalKwh} kWh`, cor: verde },
+    { label: "ECONOMIA TOTAL",  valor: `R$ ${totalEco}`, cor: verde },
+    { label: "CO2 EVITADO",     valor: `${totalCO2} kg`, cor: [79,195,247] },
+    { label: "TEMPO OPERANDO", valor: `${mesesOp} meses`, cor: cinza },
+  ];
+
+  const cardW = (pageW - 30 - 9) / 4;
+  cards.forEach((c, i) => {
+    const x = 15 + i * (cardW + 3);
+    doc.setFillColor(245,250,248);
+    doc.roundedRect(x, y, cardW, 26, 2, 2, "F");
+    doc.setDrawColor(230,230,230);
+    doc.roundedRect(x, y, cardW, 26, 2, 2, "S");
+    doc.setFontSize(7);
+    doc.setTextColor(...cinza);
+    doc.text(c.label, x + 4, y + 8);
+    doc.setFontSize(13);
+    doc.setTextColor(...c.cor);
+    doc.setFont(undefined, "bold");
+    doc.text(c.valor, x + 4, y + 18);
+    doc.setFont(undefined, "normal");
+  });
+
+  y += 38;
+
+  // ── Seção: Retorno do Investimento ──
+  doc.setFillColor(...verde);
+  doc.rect(15, y, 3, 6, "F");
+  doc.setFontSize(13);
+  doc.setTextColor(...cinzaEscuro);
+  doc.setFont(undefined, "bold");
+  doc.text("Retorno do Investimento", 21, y + 5);
+  doc.setFont(undefined, "normal");
+  y += 12;
+
+  const roiVals = document.getElementById("roi-resultado").children;
+  const roiItems = [
+    { label: "Economia mensal", valor: roiVals[0]?.querySelector(".roi-value")?.textContent || "—" },
+    { label: "Economia anual",  valor: roiVals[1]?.querySelector(".roi-value")?.textContent || "—" },
+    { label: "Payback estimado",valor: roiVals[2]?.querySelector(".roi-value")?.textContent || "—" },
+    { label: "% Recuperado",    valor: roiVals[3]?.querySelector(".roi-value")?.textContent || "—" },
+  ];
+
+  roiItems.forEach((item, i) => {
+    const x = 15 + (i % 2) * 90;
+    const yy = y + Math.floor(i / 2) * 14;
+    doc.setFontSize(9);
+    doc.setTextColor(...cinza);
+    doc.text(item.label, x, yy);
+    doc.setFontSize(11);
+    doc.setTextColor(...cinzaEscuro);
+    doc.setFont(undefined, "bold");
+    doc.text(item.valor, x, yy + 6);
+    doc.setFont(undefined, "normal");
+  });
+
+  y += 36;
+
+  // ── Gráfico de economia acumulada ──
+  doc.setFillColor(...verde);
+  doc.rect(15, y, 3, 6, "F");
+  doc.setFontSize(13);
+  doc.setTextColor(...cinzaEscuro);
+  doc.setFont(undefined, "bold");
+  doc.text("Economia Acumulada (R$)", 21, y + 5);
+  doc.setFont(undefined, "normal");
+  y += 10;
+
+  try {
+    const canvas  = document.getElementById("economiaChart");
+    const imgData = canvas.toDataURL("image/png");
+    doc.addImage(imgData, "PNG", 15, y, pageW - 30, 60);
+    y += 68;
+  } catch(e) { console.log("Gráfico de economia não capturado"); }
+
+  // ── Nova página para impacto ambiental ──
+  doc.addPage();
+  y = 20;
+
+  doc.setFillColor(...verde);
+  doc.rect(15, y, 3, 6, "F");
+  doc.setFontSize(13);
+  doc.setTextColor(...cinzaEscuro);
+  doc.setFont(undefined, "bold");
+  doc.text("Impacto Ambiental", 21, y + 5);
+  doc.setFont(undefined, "normal");
+  y += 14;
+
+  const envArvores = document.getElementById("env-arvores").textContent;
+  const envKm      = document.getElementById("env-km").textContent;
+  const envCasas   = document.getElementById("env-casas").textContent;
+
+  const envCards = [
+    { icone: "🌳", label: "Árvores plantadas (equivalente)", valor: envArvores, cor: verde },
+    { icone: "🚗", label: "Km de carro não rodados",          valor: envKm,      cor: [79,195,247] },
+    { icone: "🏠", label: "Meses de uma residência alimentada", valor: envCasas, cor: [255,184,48] },
+  ];
+
+  envCards.forEach((c) => {
+    doc.setFillColor(248,248,248);
+    doc.roundedRect(15, y, pageW - 30, 22, 2, 2, "F");
+    doc.setFontSize(10);
+    doc.setTextColor(...cinza);
+    doc.text(c.label, 22, y + 9);
+    doc.setFontSize(16);
+    doc.setTextColor(...c.cor);
+    doc.setFont(undefined, "bold");
+    doc.text(String(c.valor), 22, y + 18);
+    doc.setFont(undefined, "normal");
+    y += 26;
+  });
+
+  y += 10;
+
+  // ── Gráfico comparativo mensal ──
+  doc.setFillColor(...verde);
+  doc.rect(15, y, 3, 6, "F");
+  doc.setFontSize(13);
+  doc.setTextColor(...cinzaEscuro);
+  doc.setFont(undefined, "bold");
+  doc.text("Geração Mensal (kWh)", 21, y + 5);
+  doc.setFont(undefined, "normal");
+  y += 10;
+
+  try {
+    const canvas2  = document.getElementById("geracaoMensalChart");
+    const imgData2 = canvas2.toDataURL("image/png");
+    doc.addImage(imgData2, "PNG", 15, y, pageW - 30, 60);
+  } catch(e) { console.log("Gráfico mensal não capturado"); }
+
+  // ── Rodapé em todas as páginas ──
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(...cinza);
+    doc.text("EcoFlow Manager — EcoTech Solutions — Práticas Extensionistas", 15, 290);
+    doc.text(`Página ${i} de ${pageCount}`, pageW - 35, 290);
+  }
+
+  doc.save("ecoflow_relatorio.pdf");
+}
+  </script>
+</body>
+</html>

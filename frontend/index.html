@@ -3,12 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>EcoFlow Manager</title>
+  <title>EcoFlow Manager — Dashboard</title>
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 </head>
 <body>
+
+  <nav class="navbar">
+    <a href="index.html"      class="nav-link active"><span class="nav-icon">📊</span> Dashboard</a>
+    <a href="previsao.html"   class="nav-link"><span class="nav-icon">🌤️</span> Clima e Previsão</a>
+    <a href="relatorios.html" class="nav-link"><span class="nav-icon">📈</span> Relatórios</a>
+    <a href="paineis.html"    class="nav-link"><span class="nav-icon">☀️</span> Painéis</a>
+  </nav>
 
   <header class="header">
     <div class="logo">
@@ -38,8 +45,17 @@
         <span id="status-txt">Conectando...</span>
       </div>
     </div>
-  </header>
+    <button class="theme-toggle" id="sim-toggle" title="Modo simulação" onclick="toggleSimMenu()">🧪</button>
+    <div id="sim-menu" style="display:none;position:absolute;top:70px;right:24px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:8px;z-index:100;min-width:200px">
+    <div style="font-size:10px;color:var(--text2);padding:4px 8px;text-transform:uppercase">Simular cenário</div>
+    <button onclick="simular('nublado')" class="tab" style="width:100%;text-align:left;margin:2px 0;padding:8px">☁️ Dia nublado</button>
+    <button onclick="simular('ceu_limpo')" class="tab" style="width:100%;text-align:left;margin:2px 0;padding:8px">☀️ Céu limpo</button>
+    <button onclick="simular('falha_painel')" class="tab" style="width:100%;text-align:left;margin:2px 0;padding:8px">⚠️ Falha no painel</button>
+    <button onclick="simular('reset')" class="tab" style="width:100%;text-align:left;margin:2px 0;padding:8px;color:var(--red)">↺ Resetar</button>
+    </div>
+    </header>
 
+  <!-- Métricas -->
   <div class="metrics">
     <div class="metric">
       <div class="metric-label">⚡ Potência atual</div>
@@ -75,6 +91,7 @@
     </div>
   </div>
 
+  <!-- Gráfico + Gauge -->
   <div class="main-grid">
     <div class="card">
       <div class="card-title">
@@ -124,13 +141,18 @@
     </div>
   </div>
 
+  <!-- Painéis + Alertas -->
   <div class="bottom-grid">
     <div class="card">
-      <div class="card-title">Status dos painéis</div>
+      <div class="card-title">Status dos painéis
+        <a href="paineis.html" style="font-size:10px;color:var(--verde);text-decoration:none">Ver detalhes →</a>
+      </div>
       <div class="panel-grid" id="panel-grid"></div>
     </div>
     <div class="card">
-      <div class="card-title">Alertas automáticos</div>
+      <div class="card-title">Alertas automáticos
+        <a href="paineis.html" style="font-size:10px;color:var(--verde);text-decoration:none">Ver histórico →</a>
+      </div>
       <div class="alert-list" id="alert-list">
         <div class="alert-item">
           <div class="alert-dot info"></div>
@@ -140,60 +162,35 @@
     </div>
   </div>
 
-  <div class="card" style="margin-bottom:14px">
-    <div class="card-title">Previsão — próximos 3 dias</div>
-    <div class="forecast-grid" id="forecast-grid">
-      <div style="color:var(--text2);font-size:12px">Carregando previsão...</div>
-    </div>
-  </div>
-
-  <div class="bottom-grid2">
-    <div class="card">
-      <div class="card-title">Retorno do investimento</div>
-      <div class="roi-grid">
-        <div class="roi-item">
-          <div class="roi-label">Economia / mês</div>
-          <div class="roi-value" id="roi-economia-mes">R$ --</div>
-          <div class="roi-sub">com tarifa atual</div>
+  <!-- Acesso rápido às outras telas -->
+  <div class="three-grid">
+    <a href="previsao.html" style="text-decoration:none">
+      <div class="card" style="cursor:pointer;transition:border-color .2s" onmouseover="this.style.borderColor='var(--verde)'" onmouseout="this.style.borderColor=''">
+        <div class="card-title">🌤️ Clima e Previsão</div>
+        <div style="font-size:13px;color:var(--text2);line-height:1.6">
+          Previsão 7 dias, impacto do clima na geração, mapa de calor e estimativa por hora.
         </div>
-        <div class="roi-item">
-          <div class="roi-label">Economia / ano</div>
-          <div class="roi-value" id="roi-economia-ano">R$ --</div>
-          <div class="roi-sub">projeção anual</div>
-        </div>
-        <div class="roi-item">
-          <div class="roi-label">Tempo de retorno</div>
-          <div class="roi-value" id="roi-retorno">--</div>
-          <div class="roi-sub">payback estimado</div>
-        </div>
-        <div class="roi-item">
-          <div class="roi-label">Investimento</div>
-          <div class="roi-value" id="roi-investimento">R$ --</div>
-          <div class="roi-sub">custo instalação</div>
-        </div>
+        <div style="margin-top:12px;font-size:11px;color:var(--verde)">Acessar →</div>
       </div>
-      <div class="roi-progress">
-        <div class="roi-progress-label">
-          <span>Progresso de recuperação</span>
-          <span id="roi-pct-label">0%</span>
+    </a>
+    <a href="relatorios.html" style="text-decoration:none">
+      <div class="card" style="cursor:pointer;transition:border-color .2s" onmouseover="this.style.borderColor='var(--verde)'" onmouseout="this.style.borderColor=''">
+        <div class="card-title">📈 Relatórios e ROI</div>
+        <div style="font-size:13px;color:var(--text2);line-height:1.6">
+          Economia acumulada, calculadora de retorno, geração mensal e impacto ambiental.
         </div>
-        <div class="roi-bar"><div class="roi-bar-fill" id="roi-bar-fill" style="width:0%"></div></div>
+        <div style="margin-top:12px;font-size:11px;color:var(--verde)">Acessar →</div>
       </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Histórico de alertas</div>
-      <div class="hist-list" id="hist-list">
-        <div style="color:var(--text2);font-size:12px">Carregando histórico...</div>
+    </a>
+    <a href="paineis.html" style="text-decoration:none">
+      <div class="card" style="cursor:pointer;transition:border-color .2s" onmouseover="this.style.borderColor='var(--verde)'" onmouseout="this.style.borderColor=''">
+        <div class="card-title">☀️ Gestão dos Painéis</div>
+        <div style="font-size:13px;color:var(--text2);line-height:1.6">
+          Status detalhado, histórico de performance, alertas e registro de manutenções.
+        </div>
+        <div style="margin-top:12px;font-size:11px;color:var(--verde)">Acessar →</div>
       </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Mapa de calor — geração (kW/h)</div>
-      <div id="heatmap-wrap">
-        <div style="color:var(--text2);font-size:12px">Carregando heatmap...</div>
-      </div>
-    </div>
+    </a>
   </div>
 
   <script src="app.js"></script>

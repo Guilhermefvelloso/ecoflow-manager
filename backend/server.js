@@ -12,9 +12,9 @@ app.use(cors());
 app.use(express.json());
 
 // ─── Coordenadas (Paracambi, RJ) ─────────────────────────────────────────────
-const LAT    = -22.6078;
-const LON    = -43.7094;
-const CIDADE = "Paracambi";
+let LAT_ATUAL    = -22.6078;
+let LON_ATUAL    = -43.7094;
+let CIDADE_ATUAL = "Paracambi";
 
 // ─── Estado global ────────────────────────────────────────────────────────────
 let solarData = {
@@ -24,8 +24,8 @@ let solarData = {
   custo_kwh: 0.95,          // R$/kWh (tarifa média Brasil)
   potencia_instalada: 2800, // W pico
   investimento: 15000,      // R$ (custo da instalação)
-  clima: { temperatura: 28, descricao: "Céu limpo", icone: "01d", umidade: 65, vento: 12, nebulosidade: 10, cidade: CIDADE, fator_geracao: 1.0 },
-  previsao: [],             // próximos 3 dias
+  clima: { temperatura: 28, descricao: "Céu limpo", icone: "01d", umidade: 65, vento: 12, nebulosidade: 10, cidade: CIDADE_ATUAL, fator_geracao: 1.0 },
+  previsao: [],             // próximos 7 dias
   paineis: [
     { id:"P1", potencia:390, eficiencia:92, status:"ok" },
     { id:"P2", potencia:375, eficiencia:89, status:"ok" },
@@ -66,10 +66,10 @@ function fatorDeNuvens(n) {
 // ─── Busca clima + previsão (Open-Meteo, sem key) ─────────────────────────────
 function buscarClima() {
   return new Promise((resolve) => {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}`
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT_ATUAL}&longitude=${LON_ATUAL}`
       + `&current=temperature_2m,relative_humidity_2m,wind_speed_10m,cloud_cover,weather_code`
       + `&daily=temperature_2m_max,temperature_2m_min,weather_code,cloud_cover_mean,precipitation_sum`
-      + `&timezone=America/Sao_Paulo&forecast_days=4`;
+      + `&timezone=America/Sao_Paulo&forecast_days=8`;
 
     https.get(url, (res) => {
       let raw = "";
@@ -88,12 +88,12 @@ function buscarClima() {
             umidade:       c.relative_humidity_2m,
             vento:         Math.round(c.wind_speed_10m),
             nebulosidade:  nv,
-            cidade:        CIDADE,
+            cidade:        CIDADE_ATUAL,
             fator_geracao: fatorDeNuvens(nv),
           };
 
-          // Próximos 3 dias (índices 1,2,3)
-          solarData.previsao = [1,2,3].map(i => {
+          // Próximos 7 dias (índices 1 a 7)
+          solarData.previsao = [1,2,3,4,5,6,7].map(i => {
             const nuvDia = d.cloud_cover_mean[i] || 0;
             const fator  = fatorDeNuvens(nuvDia);
             const { descricao: desc, icone: ico } = wmoDescricao(d.weather_code[i], nuvDia);
@@ -114,7 +114,7 @@ function buscarClima() {
           });
 
           gerarAlertas();
-          console.log(`[Clima] ${solarData.clima.descricao} ${solarData.clima.temperatura}°C nuvens=${nv}%`);
+          console.log(`[Clima] ${solarData.clima.descricao} ${solarData.clima.temperatura}°C nuvens=${nv}% (${CIDADE_ATUAL})`);
           resolve();
         } catch(e) {
           console.error("[Clima] Erro:", e.message);
@@ -135,11 +135,13 @@ function gerarAlertas() {
     alertas.push({ tipo:"warn", msg:`Alta nebulosidade (${solarData.clima.nebulosidade}%) — geração em ${Math.round(solarData.clima.fator_geracao*100)}%`, hora:`Hoje, ${hora}` });
 
   if (solarData.clima.nebulosidade <= 20)
-    alertas.push({ tipo:"ok", msg:`Céu limpo em ${CIDADE} — condições ideais de geração`, hora:`Hoje, ${hora}` });
+    alertas.push({ tipo:"ok", msg:`Céu limpo em ${CIDADE_ATUAL} — condições ideais de geração`, hora:`Hoje, ${hora}` });
 
   solarData.paineis.forEach(p => {
     if (p.status === "alerta")
       alertas.push({ tipo:"warn", msg:`${p.id} com eficiência ${p.eficiencia}% — verifique sujeira ou falha`, hora:`Hoje, ${hora}` });
+    if (p.status === "erro")
+      alertas.push({ tipo:"erro", msg:`${p.id} com falha crítica — eficiência ${p.eficiencia}%`, hora:`Hoje, ${hora}` });
   });
 
   if (solarData.temperatura_painel > 60)
@@ -198,7 +200,7 @@ function gerarHistorico() {
   solarData.historico_hoje = hist;
 }
 
-// ─── Simulação ────────────────────────────────────────────────────────────────
+// ─── Simulação automática ────────────────────────────────────────────────────
 setInterval(() => {
   const agora = new Date();
   const h     = agora.getHours() + agora.getMinutes() / 60;
@@ -237,6 +239,53 @@ app.get("/api/historico",        (req, res) => res.json(solarData.historico_hoje
 app.get("/api/alertas",          (req, res) => res.json(solarData.alertas));
 app.get("/api/historico-alertas",(req, res) => res.json(solarData.historico_alertas));
 app.get("/api/heatmap",          (req, res) => res.json(solarData.heatmap));
+
+// Busca coordenadas de uma cidade via API de geocoding (Open-Meteo, gratuita)
+app.get("/api/buscar-cidade/:nome", (req, res) => {
+  const nome = req.params.nome;
+  https.get(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(nome)}&count=1&language=pt&format=json`, (resp) => {
+    let raw = "";
+    resp.on("data", c => raw += c);
+    resp.on("end", async () => {
+      try {
+        const j = JSON.parse(raw);
+        if (!j.results || !j.results.length) return res.status(404).json({ erro: "Cidade não encontrada" });
+        const r = j.results[0];
+        LAT_ATUAL    = r.latitude;
+        LON_ATUAL    = r.longitude;
+        CIDADE_ATUAL = r.name + (r.admin1 ? ", " + r.admin1 : "");
+        await buscarClima();
+        res.json({ cidade: CIDADE_ATUAL, lat: LAT_ATUAL, lon: LON_ATUAL });
+      } catch(e) { res.status(500).json({ erro: e.message }); }
+    });
+  }).on("error", e => res.status(500).json({ erro: e.message }));
+});
+
+// Modo simulação manual — força cenários de teste
+app.post("/api/simular", (req, res) => {
+  const { cenario } = req.body;
+  if (cenario === "nublado") {
+    solarData.clima.nebulosidade  = 90;
+    solarData.clima.fator_geracao = 0.25;
+    solarData.clima.descricao     = "Nublado (simulado)";
+  } else if (cenario === "falha_painel") {
+    solarData.paineis[2].eficiencia = 35;
+    solarData.paineis[2].status     = "erro";
+    solarData.paineis[2].potencia   = 140;
+  } else if (cenario === "ceu_limpo") {
+    solarData.clima.nebulosidade  = 5;
+    solarData.clima.fator_geracao = 1.0;
+    solarData.clima.descricao     = "Céu limpo (simulado)";
+  } else if (cenario === "reset") {
+    solarData.paineis[2].eficiencia = 71;
+    solarData.paineis[2].status     = "alerta";
+    solarData.paineis[2].potencia   = 298;
+    buscarClima();
+  }
+  gerarAlertas();
+  io.emit("atualizacao", solarData);
+  res.json({ status: "ok", cenario });
+});
 
 // ─── WebSocket ────────────────────────────────────────────────────────────────
 io.on("connection", socket => {

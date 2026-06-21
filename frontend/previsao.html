@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EcoFlow Manager — Clima e Previsão</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+</head>
+<body>
+
+  <nav class="navbar">
+    <a href="index.html"      class="nav-link"><span class="nav-icon">📊</span> Dashboard</a>
+    <a href="previsao.html"   class="nav-link active"><span class="nav-icon">🌤️</span> Clima e Previsão</a>
+    <a href="relatorios.html" class="nav-link"><span class="nav-icon">📈</span> Relatórios</a>
+    <a href="paineis.html"    class="nav-link"><span class="nav-icon">☀️</span> Painéis</a>
+  </nav>
+
+  <header class="header">
+    <div class="logo">
+      <div class="logo-icon">☀️</div>
+      <div>
+        <div class="logo-name">EcoFlow Manager</div>
+        <div class="logo-sub">Clima e Previsão — Paracambi, RJ</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <button class="theme-toggle" id="theme-toggle" title="Alternar tema">☀️</button>
+      <div class="status-pill">
+        <div class="pulse"></div>
+        <span id="ultima-atualizacao">Carregando...</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center">
+  <input id="input-cidade" type="text" placeholder="Buscar cidade..." class="input-field" style="width:160px;padding:7px 12px;font-size:12px">
+  <button onclick="buscarCidade()" class="theme-toggle" style="width:auto;padding:0 14px">🔍</button>
+  </div>
+  </header>
+
+  <!-- Clima atual grande -->
+  <div class="two-grid">
+    <div class="card" style="display:flex;align-items:center;gap:24px">
+      <div style="font-size:72px;line-height:1" id="clima-icon-big">🌤️</div>
+      <div>
+        <div style="font-family:var(--mono);font-size:52px;font-weight:700;color:var(--text);line-height:1" id="clima-temp-big">--°C</div>
+        <div style="font-size:16px;color:var(--text2);margin-top:6px" id="clima-desc-big">Carregando...</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:4px">Paracambi, RJ — Brasil</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Condições atuais</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="roi-item">
+          <div class="roi-label">💧 Umidade</div>
+          <div class="roi-value" id="c-umidade">--%</div>
+        </div>
+        <div class="roi-item">
+          <div class="roi-label">🌬️ Vento</div>
+          <div class="roi-value" id="c-vento">-- km/h</div>
+        </div>
+        <div class="roi-item">
+          <div class="roi-label">☁️ Nebulosidade</div>
+          <div class="roi-value" id="c-nuvens">--%</div>
+        </div>
+        <div class="roi-item">
+          <div class="roi-label">⚡ Fator solar</div>
+          <div class="roi-value" id="c-fator" style="color:var(--verde)">--%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Impacto do clima na geração -->
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title">Impacto do clima na geração de energia</div>
+    <div style="position:relative;height:200px">
+      <canvas id="climaGeracaoChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Previsão 7 dias -->
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title">Previsão dos próximos 7 dias</div>
+    <div class="forecast-grid-7" id="forecast-7"></div>
+  </div>
+
+  <!-- Fator solar por hora -->
+  <div class="two-grid">
+    <div class="card">
+      <div class="card-title">Estimativa de geração por hora — hoje</div>
+      <div style="position:relative;height:200px">
+        <canvas id="geracaoHoraChart"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Melhor horário para geração</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px" id="horarios-list"></div>
+    </div>
+  </div>
+
+  <!-- Heatmap completo -->
+  <div class="card" style="margin-top:14px">
+    <div class="card-title">Mapa de calor — últimos 7 dias (kW por hora)</div>
+    <div id="heatmap-wrap-big"></div>
+  </div>
+
+  <script>
+    const BACKEND = "https://ecoflow-manager.onrender.com";
+    const climaIcones = { "01d":"☀️","01n":"🌙","02d":"⛅","02n":"⛅","03d":"☁️","03n":"☁️","04d":"☁️","04n":"☁️","09d":"🌧️","09n":"🌧️","10d":"🌦️","10n":"🌦️","11d":"⛈️","11n":"⛈️","13d":"❄️","13n":"❄️","50d":"🌫️","50n":"🌫️" };
+
+    // Tema
+    const temaBtn = document.getElementById("theme-toggle");
+    let temaAtual = localStorage.getItem("tema") || "dark";
+    document.documentElement.setAttribute("data-theme", temaAtual);
+    temaBtn.textContent = temaAtual === "dark" ? "☀️" : "🌙";
+    temaBtn.addEventListener("click", () => {
+      temaAtual = temaAtual === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", temaAtual);
+      localStorage.setItem("tema", temaAtual);
+      temaBtn.textContent = temaAtual === "dark" ? "☀️" : "🌙";
+    });
+
+    async function carregarDados() {
+      try {
+        const r = await fetch(`${BACKEND}/api/dados`);
+        const d = await r.json();
+        renderClima(d.clima);
+        renderPrevisao7(d.previsao);
+        renderHeatmap(d.heatmap);
+        renderGeracaoHora(d.clima.fator_geracao);
+        renderHorarios(d.clima.fator_geracao);
+        renderImpactoChart(d.previsao);
+        document.getElementById("ultima-atualizacao").textContent =
+          "Atualizado: " + new Date().toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" });
+      } catch(e) {
+        document.getElementById("ultima-atualizacao").textContent = "Backend offline";
+      }
+    }
+
+    function renderClima(c) {
+      if (!c) return;
+      document.getElementById("clima-icon-big").textContent  = climaIcones[c.icone] || "🌤️";
+      document.getElementById("clima-temp-big").textContent  = `${c.temperatura}°C`;
+      document.getElementById("clima-desc-big").textContent  = c.descricao;
+      document.getElementById("c-umidade").textContent = `${c.umidade}%`;
+      document.getElementById("c-vento").textContent   = `${c.vento} km/h`;
+      document.getElementById("c-nuvens").textContent  = `${c.nebulosidade}%`;
+      const pct = Math.round(c.fator_geracao * 100);
+      const fEl = document.getElementById("c-fator");
+      fEl.textContent = `${pct}%`;
+      fEl.style.color = pct >= 80 ? "var(--verde)" : pct >= 50 ? "var(--amber)" : "var(--red)";
+    }
+
+    function renderPrevisao7(prev) {
+      if (!prev || !prev.length) return;
+      // Pega hoje + 3 dias do backend e preenche os outros com estimativas
+      const grid = document.getElementById("forecast-7");
+      const dias = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+      const hoje = new Date();
+      let html = "";
+      for (let i = 0; i < 7; i++) {
+        const dt    = new Date(hoje); dt.setDate(hoje.getDate() + i);
+        const dado = prev[i] || { dia: dias[dt.getDay()], data: dt.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"}), temp_max: "--", temp_min: "--", descricao: "N/D", icone: "02d", fator_geracao: 0.7, geracao_est: 9.8, chuva: 0 };
+        const icone = climaIcones[dado.icone] || "🌤️";
+        const cor   = dado.fator_geracao >= 0.8 ? "var(--verde)" : dado.fator_geracao >= 0.5 ? "var(--amber)" : "var(--red)";
+        const pct   = Math.round(dado.fator_geracao * 100);
+        html += `
+          <div class="forecast-card">
+            <div class="fc-dia">${i === 0 ? "Hoje" : dado.dia}</div>
+            <div class="fc-data">${dado.data}</div>
+            <div class="fc-icon">${icone}</div>
+            <div class="fc-desc">${dado.descricao}</div>
+            <div class="fc-temp"><span class="max">${dado.temp_max}°</span> / <span class="min">${dado.temp_min}°</span></div>
+            ${dado.chuva > 0 ? `<div style="font-size:10px;color:var(--blue);margin-top:4px">🌧 ${dado.chuva}mm</div>` : ""}
+            <div class="fc-ger" style="color:${cor}">${dado.geracao_est} kWh</div>
+            <div class="fc-bar"><div class="fc-bar-fill" style="width:${pct}%;background:${cor}"></div></div>
+          </div>`;
+      }
+      grid.innerHTML = html;
+    }
+
+    function renderGeracaoHora(fator) {
+      const labels = Array.from({length:13},(_,i)=>`${i+6}h`);
+      const real   = labels.map((_,i) => {
+        const curva = Math.max(0, Math.sin((i/12)*Math.PI));
+        return parseFloat((curva * 2.6 * fator).toFixed(2));
+      });
+      new Chart(document.getElementById("geracaoHoraChart"), {
+        type:"bar",
+        data:{ labels, datasets:[{ data:real, backgroundColor:"rgba(0,208,132,0.6)", borderColor:"#00D084", borderWidth:1, borderRadius:4 }] },
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          plugins:{ legend:{display:false} },
+          scales:{
+            x:{ ticks:{color:"#7A8FA0",font:{size:10}}, grid:{color:"rgba(255,255,255,0.04)"} },
+            y:{ ticks:{color:"#7A8FA0",font:{size:10}}, grid:{color:"rgba(255,255,255,0.04)"} }
+          }
+        }
+      });
+    }
+
+    function renderHorarios(fator) {
+      const horarios = [
+        { h:"09h – 11h", pct:Math.round(70*fator), label:"Manhã" },
+        { h:"11h – 13h", pct:Math.round(95*fator), label:"Pico máximo" },
+        { h:"13h – 15h", pct:Math.round(90*fator), label:"Tarde" },
+        { h:"15h – 17h", pct:Math.round(65*fator), label:"Fim de tarde" },
+      ];
+      document.getElementById("horarios-list").innerHTML = horarios.map(h => {
+        const cor = h.pct >= 80 ? "var(--verde)" : h.pct >= 50 ? "var(--amber)" : "var(--red)";
+        return `
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text2);min-width:90px">${h.h}</div>
+            <div style="flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden">
+              <div style="width:${h.pct}%;height:100%;background:${cor};border-radius:3px;transition:width .5s"></div>
+            </div>
+            <div style="font-family:var(--mono);font-size:11px;color:${cor};min-width:30px">${h.pct}%</div>
+            <div style="font-size:10px;color:var(--text2)">${h.label}</div>
+          </div>`;
+      }).join("");
+    }
+
+    function renderImpactoChart(prev) {
+  if (!prev || !prev.length) return;
+  const labels  = prev.map(p => p.dia);
+  const ger     = prev.map(p => p.geracao_est);
+  const nuvens  = prev.map(p => p.nebulosidade);
+  const cores   = prev.map(p =>
+    p.fator_geracao >= 0.8 ? "rgba(0,208,132,0.7)" :
+    p.fator_geracao >= 0.5 ? "rgba(255,184,48,0.7)" :
+    "rgba(255,87,87,0.7)"
+  );
+  new Chart(document.getElementById("climaGeracaoChart"), {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Geração estimada (kWh)",
+          data: ger,
+          backgroundColor: cores,
+          borderColor: cores.map(c => c.replace("0.7","1")),
+          borderWidth: 1,
+          borderRadius: 5,
+          yAxisID: "y"
+        },
+        {
+          label: "Nebulosidade (%)",
+          data: nuvens,
+          type: "line",
+          borderColor: "#FFB830",
+          backgroundColor: "rgba(255,184,48,0.08)",
+          fill: true,
+          borderWidth: 2,
+          pointRadius: 5,
+          pointBackgroundColor: "#FFB830",
+          tension: 0.4,
+          yAxisID: "y1"
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: "#7A8FA0", font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.dataset.label + ": " + ctx.raw + (ctx.datasetIndex === 1 ? "%" : " kWh")
+          }
+        }
+      },
+      scales: {
+        y:  { ticks:{color:"#7A8FA0",font:{size:10}}, grid:{color:"rgba(255,255,255,0.04)"}, title:{display:true,text:"kWh",color:"#7A8FA0"} },
+        y1: { position:"right", min:0, max:100, ticks:{color:"#7A8FA0",font:{size:10}}, grid:{display:false}, title:{display:true,text:"Nebulosidade %",color:"#7A8FA0"} },
+        x:  { ticks:{color:"#7A8FA0",font:{size:10}}, grid:{color:"rgba(255,255,255,0.04)"} }
+      }
+    }
+  });
+}
+
+    function renderHeatmap(dados) {
+      if (!dados || !dados.length) return;
+      const wrap  = document.getElementById("heatmap-wrap-big");
+      const horas = [6,7,8,9,10,11,12,13,14,15,16,17,18];
+      const max   = 2.6;
+      function cor(v) {
+        if (v <= 0) return "var(--bg3)";
+        const t = Math.min(v/max,1);
+        return `rgba(0,${Math.round(130+t*125)},${Math.round(80+t*50)},${0.2+t*0.8})`;
+      }
+      let html = `<div class="heatmap-wrap"><table class="heatmap-table"><thead><tr><th></th>`;
+      horas.forEach(h => html += `<th>${h}h</th>`);
+      html += `</tr></thead><tbody>`;
+      dados.forEach(row => {
+        html += `<tr><td class="hm-day">${row.dia}</td>`;
+        horas.forEach(h => {
+          const v = row.horas[h] || 0;
+          html += `<td style="background:${cor(v)}" title="${h}h: ${v.toFixed(2)} kW"></td>`;
+        });
+        html += `</tr>`;
+      });
+      html += `</tbody></table></div>`;
+      wrap.innerHTML = html;
+    }
+
+    async function buscarCidade() {
+    const nome = document.getElementById("input-cidade").value.trim();
+    if (!nome) return;
+    document.getElementById("ultima-atualizacao").textContent = "Buscando cidade...";
+    try {
+    const r = await fetch(`${BACKEND}/api/buscar-cidade/${encodeURIComponent(nome)}`);
+    const d = await r.json();
+    if (d.erro) { alert("Cidade não encontrada"); return; }
+    document.getElementById("input-cidade").value = "";
+    carregarDados();
+    } catch(e) { alert("Erro ao buscar cidade"); }
+}
+
+    carregarDados();
+    setInterval(carregarDados, 10 * 60 * 1000);
+  </script>
+</body>
+</html>

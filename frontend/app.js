@@ -1,5 +1,5 @@
 // ── Config ────────────────────────────────────────────────────────────────────
-const BACKEND = ("https://ecoflow-manager.onrender.com");
+const BACKEND = "https://ecoflow-manager.onrender.com";
 
 // ── Tema claro/escuro ─────────────────────────────────────────────────────────
 const temaBtn = document.getElementById("theme-toggle");
@@ -65,7 +65,7 @@ function atualizarClima(c) {
 function atualizarPrevisao(prev) {
   if (!prev || !prev.length) return;
   const grid = document.getElementById("forecast-grid");
-  grid.innerHTML = prev.map(d => {
+  grid.innerHTML = prev.slice(0,3).map(d => {
     const icone = climaIcones[d.icone] || "🌤️";
     const cor   = d.fator_geracao >= 0.8 ? "var(--verde)" : d.fator_geracao >= 0.5 ? "var(--amber)" : "var(--red)";
     const pct   = Math.round(d.fator_geracao * 100);
@@ -89,7 +89,7 @@ function atualizarROI(d) {
   const economia_ano   = economia_mes * 12;
   const anos_retorno   = d.investimento / economia_ano;
   const meses_retorno  = Math.round(anos_retorno * 12);
-  const pct_recuperado = Math.min(100, Math.round((economia_ano / d.investimento) * 100 * 3)); // estimando 3 anos de uso
+  const pct_recuperado = Math.min(100, Math.round((economia_ano / d.investimento) * 100 * 3));
 
   document.getElementById("roi-economia-mes").textContent  = `R$ ${economia_mes.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
   document.getElementById("roi-economia-ano").textContent  = `R$ ${economia_ano.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
@@ -103,6 +103,7 @@ function atualizarROI(d) {
 function renderHeatmap(dados) {
   if (!dados || !dados.length) return;
   const wrap  = document.getElementById("heatmap-wrap");
+  if (!wrap) return;
   const horas = [6,7,8,9,10,11,12,13,14,15,16,17,18];
   const max   = 2.6;
 
@@ -135,7 +136,9 @@ function renderHeatmap(dados) {
 // ── Histórico de alertas ──────────────────────────────────────────────────────
 function atualizarHistoricoAlertas(hist) {
   if (!hist || !hist.length) return;
-  document.getElementById("hist-list").innerHTML = hist.map(a => `
+  const el = document.getElementById("hist-list");
+  if (!el) return;
+  el.innerHTML = hist.map(a => `
     <div class="hist-item">
       <div class="alert-dot ${a.tipo}"></div>
       <div>
@@ -173,18 +176,29 @@ function atualizarDashboard(d) {
 
   document.getElementById("v-val").textContent   = d.tensao.toFixed(1) + " V";
   document.getElementById("i-val").textContent   = d.corrente.toFixed(2) + " A";
-  document.getElementById("eff-pct").textContent = d.eficiencia + "%";
 
-  // Cor do gauge por eficiência
-  const corGauge = d.eficiencia >= 70 ? "var(--verde)" : d.eficiencia >= 40 ? "var(--amber)" : "var(--red)";
-  document.getElementById("eff-pct").style.color = corGauge;
+  // Estado noturno — só aplica fora do horário solar
+  const hora = new Date().getHours();
+  if (hora < 6 || hora >= 19) {
+    document.getElementById("eff-pct").textContent = "🌙";
+    document.getElementById("eff-pct").style.fontSize = "28px";
+    const lbl = document.getElementById("eff-pct").nextElementSibling;
+    if (lbl) lbl.textContent = "standby noturno";
+  } else {
+    document.getElementById("eff-pct").textContent = d.eficiencia + "%";
+    document.getElementById("eff-pct").style.fontSize = "30px";
+    const corGauge = d.eficiencia >= 70 ? "var(--verde)" : d.eficiencia >= 40 ? "var(--amber)" : "var(--red)";
+    document.getElementById("eff-pct").style.color = corGauge;
+    const lbl = document.getElementById("eff-pct").nextElementSibling;
+    if (lbl) lbl.textContent = "eficiência";
+  }
 
   if (d.clima)             atualizarClima(d.clima);
   if (d.previsao)          atualizarPrevisao(d.previsao);
   if (d.paineis)           atualizarPaineis(d.paineis);
   if (d.alertas)           atualizarAlertas(d.alertas);
   if (d.historico_alertas) atualizarHistoricoAlertas(d.historico_alertas);
-  if (d.heatmap)           renderHeatmap(d.heatmap);
+  if (d.heatmap)            renderHeatmap(d.heatmap);
   atualizarROI(d);
   atualizarGauge(d.eficiencia);
 }
@@ -247,7 +261,9 @@ atualizarGauge(0);
 
 // ── Painéis ───────────────────────────────────────────────────────────────────
 function atualizarPaineis(paineis) {
-  document.getElementById("panel-grid").innerHTML = paineis.map(p => `
+  const grid = document.getElementById("panel-grid");
+  if (!grid) return;
+  grid.innerHTML = paineis.map(p => `
     <div class="panel-cell ${p.status}">
       <div class="panel-id">${p.id}</div>
       <div class="panel-pct">${p.eficiencia}%</div>
@@ -255,8 +271,28 @@ function atualizarPaineis(paineis) {
     </div>`).join("");
 }
 
+// ── Som de alerta crítico ─────────────────────────────────────────────────────
+let ultimoNivelAlerta = "ok";
+function tocarSomAlerta() {
+  try {
+    const ctx  = new (window.AudioContext || window.webkitAudioContext)();
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    osc.type = "sine";
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc.start(); osc.stop(ctx.currentTime + 0.3);
+  } catch(e) { console.log("Áudio não disponível:", e.message); }
+}
+
 // ── Alertas ───────────────────────────────────────────────────────────────────
 function atualizarAlertas(alertas) {
+  const temErro = alertas.some(a => a.tipo === "erro" || a.tipo === "warn");
+  if (temErro && ultimoNivelAlerta === "ok") tocarSomAlerta();
+  ultimoNivelAlerta = temErro ? "alerta" : "ok";
+
   document.getElementById("alert-list").innerHTML = alertas.map(a => `
     <div class="alert-item">
       <div class="alert-dot ${a.tipo}"></div>
@@ -265,6 +301,23 @@ function atualizarAlertas(alertas) {
         <div class="alert-time">${a.hora}</div>
       </div>
     </div>`).join("");
+}
+
+// ── Simulação manual ──────────────────────────────────────────────────────────
+function toggleSimMenu() {
+  const menu = document.getElementById("sim-menu");
+  menu.style.display = menu.style.display === "none" ? "block" : "none";
+}
+
+async function simular(cenario) {
+  document.getElementById("sim-menu").style.display = "none";
+  try {
+    await fetch(`${BACKEND}/api/simular`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cenario })
+    });
+  } catch(e) { console.error("Erro ao simular:", e); }
 }
 
 // ── Fallback HTTP ─────────────────────────────────────────────────────────────
